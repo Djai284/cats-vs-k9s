@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 
 const GRID_SIZE = 50;
 const ROWS = 6;
@@ -122,14 +122,22 @@ const Cat = ({ x, y, breed, health, onClick }) => {
 };
 
 const Dog = ({ x, y, breed, health, maxHealth }) => {
-  const healthPercentage = Math.max(0, Math.min(100, (health / maxHealth) * 100));
-  
+  const healthPercentage = Math.max(
+    0,
+    Math.min(100, (health / maxHealth) * 100)
+  );
+
   return (
-    <div className={`absolute flex flex-col justify-center items-center w-[50px] h-[50px] ${breed.color} text-2xl`}
-         style={{ left: x, top: y }}>
+    <div
+      className={`absolute flex flex-col justify-center items-center w-[50px] h-[50px] ${breed.color} text-2xl`}
+      style={{ left: x, top: y }}
+    >
       {breed.emoji}
       <div className="w-4/5 h-1 bg-red-500 mt-1">
-        <div className="h-full bg-green-500" style={{ width: `${healthPercentage}%` }} />
+        <div
+          className="h-full bg-green-500"
+          style={{ width: `${healthPercentage}%` }}
+        />
       </div>
     </div>
   );
@@ -233,6 +241,12 @@ const FelinesVsCanines = () => {
   const [isMuted, setIsMuted] = useState(false);
   const backgroundMusicRef = useRef(null);
 
+  const checkVictory = useCallback(() => {
+    if (allWavesSpawned && dogs.length === 0 && !isVictory) {
+      setIsVictory(true);
+    }
+  }, [allWavesSpawned, dogs.length, isVictory]);
+
   // Initialize audio on first render
   useEffect(() => {
     initAudio();
@@ -316,8 +330,8 @@ const FelinesVsCanines = () => {
       });
 
       // Move dogs and attack cats
-      setDogs((prevDogs) =>
-        prevDogs
+      setDogs((prevDogs) => {
+        const updatedDogs = prevDogs
           .map((dog) => {
             const newX = dog.x - dog.breed.speed;
             const gridCol = Math.floor(newX / GRID_SIZE);
@@ -351,8 +365,14 @@ const FelinesVsCanines = () => {
 
             return { ...dog, x: newX };
           })
-          .filter(Boolean)
-      ); // Remove any null dogs
+          .filter(Boolean);
+
+        if (updatedDogs.length < prevDogs.length) {
+          // If a dog left the screen, check for victory
+          setTimeout(checkVictory, 0);
+        }
+        return updatedDogs;
+      }); // Remove any null dogs
 
       // Move projectiles
       setProjectiles((prevProjectiles) =>
@@ -407,7 +427,12 @@ const FelinesVsCanines = () => {
           });
         });
         // Remove dogs with 0 or less health
-        return prevDogs.filter((dog) => dog.health > 0);
+        const updatedDogs = prevDogs.filter((dog) => dog.health > 0);
+        if (updatedDogs.length < prevDogs.length) {
+          // If a dog was defeated, check for victory
+          setTimeout(checkVictory, 0);
+        }
+        return updatedDogs;
       });
 
       // Wave management
@@ -461,7 +486,15 @@ const FelinesVsCanines = () => {
     }, 1000 / 60);
 
     return () => clearInterval(gameLoop);
-  }, [grid, isWaveActive, currentWave, isGameOver, isVictory, isPaused]);
+  }, [
+    grid,
+    isWaveActive,
+    currentWave,
+    isGameOver,
+    isVictory,
+    isPaused,
+    checkVictory,
+  ]);
 
   const handleCanvasClick = (event) => {
     if (isGameOver || isVictory || isPaused) return;
